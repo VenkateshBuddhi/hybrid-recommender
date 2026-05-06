@@ -1,256 +1,262 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" alt="scikit-learn">
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="MIT License">
-</p>
+```
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║    H Y B R I D R E C                                             ║
+║    ─────────────────────────────────────────────────────────     ║
+║    Hybrid Recommender System · Leona Goel · VIT 2024–2028        ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+```
 
-# HybridRec — Hybrid Recommender System
+<div align="center">
 
-A production-ready **Hybrid Recommender System** that combines **Content-Based Filtering (TF-IDF)**, **Collaborative Filtering (SVD)**, and **NLP Sentiment Analysis (VADER)** with a weighted scoring engine, PostgreSQL full-text search, and a modern Amazon-like web interface.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)](https://scikit-learn.org)
+[![NLTK](https://img.shields.io/badge/NLTK-VADER_NLP-154f3c?style=flat-square)](https://nltk.org)
+[![MIT License](https://img.shields.io/badge/License-MIT-ff6b35?style=flat-square)](LICENSE)
 
-> **25,000+ products** · **Sub-50ms search** · **Cold-start resilient** · **Supabase-backed**
+</div>
 
 ---
 
-## ✨ Demo
+> A production-ready recommender fusing **Content-Based Filtering (TF-IDF)**, **Collaborative Filtering (SVD)**, and **NLP Sentiment Analysis (VADER)** with a tunable weighted scoring engine — backed by Supabase PostgreSQL, served via FastAPI, and built to be **dataset-agnostic by design**.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ◆ HybridRec        🔍 Search products...         👤 Sign In   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│            Discover products you'll love                        │
-│     AI-powered recommendations using content analysis,          │
-│       collaborative filtering, and sentiment intelligence.      │
-│                                                                 │
-│            ● Ready — 25,450 products                            │
-│                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
-│  │ BOOKS    │  │ SPORTS   │  │ SPORTS   │  │ AUTO     │       │
-│  │          │  │          │  │          │  │          │       │
-│  │ Wireless │  │ Classic  │  │ Ergono.. │  │ Classic  │       │
-│  │ Guide    │  │ Jersey X │  │ Racket   │  │ DashCam  │       │
-│  │ ★★★★★  │  │ ★★★★★  │  │ ★★★★★  │  │ ★★★★★  │       │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘       │
-└─────────────────────────────────────────────────────────────────┘
+25,000+ products  ·  Sub-50ms search  ·  3 ML models fused  ·  ~60% faster integration
 ```
 
 ---
 
-## Architecture
+## 01 — Architecture
+
+The core insight: blend three independent signals, each capturing something the others miss.
 
 ```
 User Reviews (text)           ──→  NLP Engine (VADER Sentiment)    ──┐
-Item Metadata (title/desc)    ──→  Content Vectorization (TF-IDF)  ──┤──→ Weighted Hybrid ──→ Ranked Results
-User Purchases (clicks/buys)  ──→  Matrix Factorization (SVD)      ──┘         Score
+Item Metadata (title/desc)    ──→  Content Vectorization (TF-IDF)  ──┼──→  Weighted Hybrid  ──→  Ranked Results
+User Purchases (clicks/buys)  ──→  Matrix Factorization (SVD)      ──┘         Engine
 
-                    Hybrid Score = α·content + β·collab + γ·sentiment
+     Hybrid Score  =  α · content_score        [TF-IDF cosine similarity]
+                    + β · collab_score          [Truncated SVD latent space]
+                    + γ · sentiment_score       [VADER compound polarity]
+
+     // α, β, γ are live-tunable via API or UI sliders
 ```
 
-### How It Works
+<details>
+<summary><b>α — Content Model &nbsp;·&nbsp; TF-IDF + Cosine Similarity</b></summary>
+<br/>
 
-#### 1. Data Adapter (`data_adapter.py`)
-- **Dynamic Column Detection** — fuzzy-matches column names (`product_name` → `title`, `stars` → `rating`)
-- **Multi-Format** — CSV and JSON with automatic encoding fallback (UTF-8 → Latin-1 → CP1252)
-- **Fault-Tolerant** — skips bad lines, imputes missing values, handles NaN/Infinity gracefully
+Item metadata (`title` + `description` + `category`) vectorized with TF-IDF (unigrams + bigrams, max 5,000 features). On-the-fly cosine similarity yields `content_score ∈ [0, 1]`. Fast, interpretable, and requires **zero user history** — ideal for cold-start.
 
-#### 2. Content Score — TF-IDF & Cosine Similarity
-- Item metadata (`title` + `description` + `category`) vectorized with TF-IDF (unigrams + bigrams, max 5000 features)
-- On-the-fly cosine similarity yields `content_score` ∈ [0, 1]
+</details>
 
-#### 3. Collaborative Score — Truncated SVD
-- User-item interaction matrix built from purchases + implicit feedback (views, clicks)
-- SVD reduces to 50 latent factors; cosine similarity in latent space yields `collab_score`
-- **Adaptive rank** — automatically reduces SVD components for sparse matrices
+<details>
+<summary><b>β — Collaborative Model &nbsp;·&nbsp; Truncated SVD</b></summary>
+<br/>
 
-#### 4. Sentiment Score — NLTK VADER
-- Review text analyzed for compound polarity ∈ [-1, 1]
-- Per-item aggregation → Min-Max normalization → `sentiment_score` ∈ [0, 1]
+User-item interaction matrix built from purchases + implicit feedback (views, clicks). SVD reduces to 50 latent factors; cosine similarity in latent space yields `collab_score`. **Adaptive rank** automatically reduces SVD components for sparse matrices.
 
-#### 5. Cold-Start Handling
-- **Bayesian average rating** — prevents 1-review 5-star bias
-- **Popularity-based fallback** — new items ranked by review count and category similarity
+</details>
+
+<details>
+<summary><b>γ — Sentiment Model &nbsp;·&nbsp; NLTK VADER</b></summary>
+<br/>
+
+Review text analyzed for compound polarity ∈ [-1, 1]. Per-item aggregation → Min-Max normalization → `sentiment_score ∈ [0, 1]`. Surfaces genuinely loved products, not just popular ones.
+
+</details>
+
+<details>
+<summary><b>❄ Cold-Start Handling</b></summary>
+<br/>
+
+- **Bayesian average rating** — prevents 1-review, 5-star bias
+- **Popularity-based fallback** — ranks new items by review count and category similarity
 - **Mock user seeding** — synthetic purchase history to bootstrap collaborative filtering
 
----
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| 🔍 **PostgreSQL FTS** | Full-text search with GIN indexes — sub-50ms on 250k+ rows |
-| 🔐 **Supabase Auth** | Guest (anonymous) and email/password authentication |
-| 📊 **3 ML Models** | Content (TF-IDF), Collaborative (SVD), Sentiment (VADER) |
-| ⚖️ **Tunable Weights** | Live α/β/γ sliders to adjust recommendation blend |
-| 📦 **Multi-Format Upload** | CSV and JSON with auto-column detection |
-| ⌨️ **Type-to-Search** | Global keyboard capture — start typing anywhere to search |
-| 🎨 **Modern UI** | Amazon-inspired dark header, card grid, skeleton loaders |
-| 📱 **Responsive** | 4 → 3 → 2 → 1 column grid across breakpoints |
-| 🛡️ **Row-Level Security** | Supabase RLS policies on all tables |
-| 🧊 **Cold-Start Resilient** | Bayesian avg + popularity fallback for new items |
+</details>
 
 ---
 
-## Tech Stack
+## 02 — Features
 
-| Layer | Technology |
-|-------|------------|
-| **Backend** | Python 3.10+, FastAPI, Uvicorn |
-| **Database** | Supabase (PostgreSQL), Row-Level Security |
-| **Search** | PostgreSQL Full-Text Search (GIN indexes, `ts_rank`) |
-| **Auth** | Supabase Auth (anonymous + email/password) |
-| **ML Models** | scikit-learn (TF-IDF, TruncatedSVD, cosine similarity) |
-| **NLP** | NLTK VADER SentimentIntensityAnalyzer |
-| **Data** | Pandas, NumPy, SciPy (sparse matrices) |
-| **Frontend** | HTML5, CSS3, Vanilla JavaScript, Supabase JS v2 |
+| Feature | Detail |
+|---|---|
+| `PostgreSQL FTS` | GIN-indexed full-text search — sub-50ms on 250k+ rows |
+| `Supabase Auth` | Guest (anonymous) and email/password, Row-Level Security on all tables |
+| `Tunable Weights` | Live α/β/γ sliders to adjust recommendation blend in real time |
+| `Dataset-Agnostic` | Fuzzy column detection (`product_name` → `title`) cuts integration time by ~60% |
+| `Cold-Start Resilient` | Bayesian avg rating + popularity fallback for new users and items |
+| `Type-to-Search` | Global keyboard capture — start typing anywhere to search instantly |
+| `Responsive UI` | Amazon-inspired dark header, 4→3→2→1 column card grid across breakpoints |
+| `Secure by Default` | Pydantic validation, parameterized queries, CORS-restricted, no stack-trace leakage |
 
 ---
 
-## Project Structure
+## 03 — Tech Stack
+
+```
+┌─────────────────┬────────────────────────────────────────────────┐
+│ Layer           │ Technology                                      │
+├─────────────────┼────────────────────────────────────────────────┤
+│ Backend         │ Python 3.10+, FastAPI, Uvicorn                 │
+│ Database        │ Supabase (PostgreSQL), Row-Level Security       │
+│ Search          │ PostgreSQL FTS (GIN indexes, ts_rank)          │
+│ Auth            │ Supabase Auth (anonymous + email/password)      │
+│ ML — Content    │ scikit-learn: TF-IDF Vectorizer, Cosine Sim    │
+│ ML — Collab     │ scikit-learn: TruncatedSVD, SciPy sparse       │
+│ NLP             │ NLTK VADER SentimentIntensityAnalyzer           │
+│ Data            │ Pandas, NumPy                                   │
+│ Frontend        │ HTML5, CSS3, Vanilla JS, Supabase JS v2        │
+└─────────────────┴────────────────────────────────────────────────┘
+```
+
+---
+
+## 04 — Project Structure
 
 ```
 hybrid-recommender/
+│
 ├── backend/
-│   └── main.py                 # FastAPI server — search, upload, build, recommend
+│   └── main.py                  # FastAPI server — search, upload, build, recommend
+│
 ├── frontend/
-│   ├── index.html              # Single-page UI (Amazon-like layout)
-│   ├── styles.css              # Design system (dark header, cards, animations)
-│   └── app.js                  # Frontend logic (auth, search, rendering)
+│   ├── index.html               # Single-page UI (Amazon-like layout)
+│   ├── styles.css               # Design system (dark header, cards, animations)
+│   └── app.js                   # Frontend logic (auth, search, rendering)
+│
 ├── scripts/
-│   ├── generate_sample_data.py # Synthetic test dataset generator
-│   ├── import_to_supabase.py   # Batch import CSV/JSON → PostgreSQL
-│   └── seed_mock_data.py       # Create mock users + purchases (cold-start)
-├── datasets/                   # CSV/JSON data files
-├── data_adapter.py             # Auto column detection + schema normalization
-├── db.py                       # Supabase client singleton (anon + admin)
-├── content_model.py            # TF-IDF content-based recommender
-├── collaborative_model.py      # SVD collaborative recommender + implicit feedback
-├── hybrid_model.py             # Weighted hybrid engine (Bayesian avg, popularity)
-├── nlp_engine.py               # VADER sentiment analysis
-├── evaluation.py               # Precision@K, Recall@K, NDCG@K benchmarks
-├── requirements.txt            # Python dependencies
-├── .env.example                # Environment variable template
-└── SETUP.md                    # Detailed setup guide
+│   ├── generate_sample_data.py  # Synthetic test dataset generator
+│   ├── import_to_supabase.py    # Batch import CSV/JSON → PostgreSQL
+│   └── seed_mock_data.py        # Mock users + purchases for cold-start bootstrap
+│
+├── data_adapter.py              # ⭐ Auto column detection + schema normalization
+├── content_model.py             # TF-IDF content-based recommender
+├── collaborative_model.py       # SVD collaborative recommender + implicit feedback
+├── hybrid_model.py              # Weighted hybrid engine (Bayesian avg, popularity)
+├── nlp_engine.py                # VADER sentiment analysis pipeline
+├── evaluation.py                # Precision@K, Recall@K, NDCG@K benchmarks
+├── db.py                        # Supabase client singleton (anon + admin)
+├── requirements.txt
+├── .env.example
+└── SETUP.md
 ```
 
 ---
 
-## Quick Start
+## 05 — Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- A [Supabase](https://supabase.com) account (free tier works)
-
-### 1. Clone & Install
+**Prerequisites:** Python 3.10+ · Supabase account *(free tier works)*
 
 ```bash
-git clone https://github.com/your-username/hybrid-recommender.git
+# 1 — Clone & install
+git clone https://github.com/leonagoel/hybrid-recommender.git
 cd hybrid-recommender
-python -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
-
-### 2. Configure Supabase
-
-Create a `.env` file from the template:
 
 ```bash
+# 2 — Configure Supabase
 cp .env.example .env
+# Fill in from: Supabase Dashboard → Settings → API
 ```
-
-Fill in your Supabase credentials (from [Supabase Dashboard → Settings → API](https://supabase.com/dashboard)):
 
 ```env
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-role-key   # Optional — needed for bulk import scripts
+SUPABASE_SERVICE_KEY=your-service-role-key   # Required for bulk import
 ```
 
-### 3. Set Up Database
-
-Run the SQL migrations in your Supabase SQL Editor — see [`SETUP.md`](SETUP.md) for the full schema.
-
-### 4. Start the Server
-
 ```bash
+# 3 — Run SQL migrations
+# See SETUP.md for full schema → paste into Supabase SQL Editor
+
+# 4 — Start the server
 python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 5. Use It
+Open **http://localhost:8000**, upload any CSV/JSON from `datasets/`, click **Build Models**, then start typing to search.
 
-Open **http://localhost:8000**:
-
-1. Click **Upload Dataset** → select any CSV/JSON file from `datasets/`
-2. Click **Build Models** → trains TF-IDF, SVD, and sentiment models
-3. **Type anywhere** to search → get instant results via PostgreSQL FTS
-4. Click a product → see hybrid recommendations
-
----
-
-## Data Import (Optional — Bulk)
-
-For large datasets (250k+ rows), use the import script:
+### Bulk Import (optional)
 
 ```bash
-# Import a specific file
 python scripts/import_to_supabase.py --file datasets/Books.csv --batch-size 2000
-
-# Import all files in datasets/
-python scripts/import_to_supabase.py
-
-# Seed mock users and purchases (solves cold-start)
 python scripts/seed_mock_data.py --users 50 --purchases 2000
 ```
 
-> **Note**: Bulk import scripts require `SUPABASE_SERVICE_KEY` to be set in `.env`.
+> Requires `SUPABASE_SERVICE_KEY` in `.env`
 
 ---
 
-## API Reference
+## 06 — API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/config` | Supabase public config (for frontend init) |
-| `GET` | `/api/status` | System status + product count |
-| `GET` | `/api/search?q=...&limit=20` | Full-text search (PostgreSQL FTS) |
-| `POST` | `/api/upload` | Upload CSV/JSON dataset |
-| `POST` | `/api/build` | Build recommendation models |
-| `GET` | `/api/recommend/{title}` | Get hybrid recommendations |
-| `GET` | `/api/items?page=1&per_page=50` | Paginated product list |
-| `GET` | `/api/categories` | List all categories |
-| `GET/PUT` | `/api/weights` | Get/update α, β, γ weights |
-| `GET` | `/api/purchases/{user_id}` | User purchase history |
-| `POST` | `/api/purchases` | Record a purchase |
+```
+GET    /api/config                   →  Supabase public config
+GET    /api/status                   →  System status + product count
+GET    /api/search?q=...&limit=20    →  Full-text search (PostgreSQL FTS)
+POST   /api/upload                   →  Upload CSV/JSON dataset
+POST   /api/build                    →  Train TF-IDF, SVD, VADER models
+GET    /api/recommend/{title}        →  Hybrid recommendations for an item
+GET    /api/items?page=1&per_page=50 →  Paginated product listing
+GET    /api/categories               →  All available categories
+GET    /api/weights                  →  Current α, β, γ blend weights
+PUT    /api/weights                  →  Update blend weights live
+GET    /api/purchases/{user_id}      →  User purchase history
+POST   /api/purchases                →  Record a purchase event
+```
 
 ---
 
-## Evaluation
+## 07 — Evaluation
 
 ```bash
 python evaluation.py
 ```
 
-Benchmarks Content-Only, Collab-Only, Sentiment-Only, and Hybrid configurations using:
-- **Precision@K** — fraction of relevant items in top-K
-- **Recall@K** — fraction of relevant items retrieved
-- **NDCG@K** — ranking quality (discounted cumulative gain)
+Benchmarks **Content-Only**, **Collab-Only**, **Sentiment-Only**, and **Hybrid** across:
+
+```
+Precision@K  —  fraction of relevant items in top-K
+Recall@K     —  fraction of all relevant items retrieved
+NDCG@K       —  ranking quality (discounted cumulative gain)
+```
 
 ---
 
-## Security
+## 08 — Security
 
-- ✅ No hardcoded credentials — config served via `/api/config`
-- ✅ `.env` excluded from git (`.gitignore`)
-- ✅ CORS restricted to configured origins
-- ✅ Row-Level Security (RLS) on all Supabase tables
-- ✅ Input validation via Pydantic models
-- ✅ Generic error messages to clients (no stack trace leakage)
-- ✅ SQL injection safe (Supabase SDK parameterized queries)
+```
+✓  No hardcoded credentials — config served via /api/config
+✓  .env excluded from git via .gitignore
+✓  CORS restricted to configured origins
+✓  Row-Level Security (RLS) on all Supabase tables
+✓  Input validation via Pydantic models
+✓  Generic error messages — no stack trace leakage
+✓  SQL injection safe (Supabase SDK parameterized queries)
+```
 
 ---
 
 ## License
 
-[MIT](LICENSE)
+MIT — see [`LICENSE`](LICENSE)
+
+---
+
+<div align="center">
+
+```
+Built by Leona Goel
+B.Tech CSE · Vellore Institute of Technology
+National Finalist · Smart India Hackathon 2025 · Top 8% of 950+ Teams
+```
+
+[![LinkedIn](https://img.shields.io/badge/Connect-LinkedIn-0A66C2?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/leona-goel)
+[![GitHub](https://img.shields.io/badge/Follow-GitHub-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/leonagoel)
+[![Email](https://img.shields.io/badge/Email-leona.goel23%40gmail.com-EA4335?style=flat-square&logo=gmail&logoColor=white)](mailto:leona.goel23@gmail.com)
+
+</div>
