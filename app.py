@@ -12,7 +12,15 @@ if "recently_viewed" not in st.session_state:
 uploaded_file = st.file_uploader("Upload your dataset (CSV)")
 
 if uploaded_file:
-    df = pd.read_csv(uploaded_file)
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file, encoding='utf-8')
+        except:
+            st.error("Please upload a valid CSV file.")
+            st.stop()
+    else:
+        st.error("Please upload a CSV file.")
+        st.stop()
 
     st.write("### Raw Data")
     st.dataframe(df.head())
@@ -54,7 +62,6 @@ if uploaded_file:
         st.session_state.recently_viewed = \
             st.session_state.recently_viewed[:10]
 
-        st.write(recs)
         recs = hybrid_model.recommend(selected_item)
         st.write("### Recommendations")
         st.write(recs)

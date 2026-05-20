@@ -164,6 +164,37 @@ function categoryIcon(cat) {
     return '📦';
 }
 
+// ── Wishlist ────────────────────────────────────────────────────────
+function getWishlist() {
+    return JSON.parse(localStorage.getItem('wishlist')) || [];
+}
+
+function saveWishlist(items) {
+    localStorage.setItem('wishlist', JSON.stringify(items));
+}
+
+function isWishlisted(title) {
+    return getWishlist().some(item => item.title === title);
+}
+
+function toggleWishlist(product) {
+    let wishlist = getWishlist();
+
+    const exists = wishlist.some(item => item.title === product.title);
+
+    if (exists) {
+        wishlist = wishlist.filter(item => item.title !== product.title);
+        toast('Removed from wishlist', 'info');
+    } else {
+        wishlist.push(product);
+        toast('Added to wishlist', 'success');
+    }
+
+    saveWishlist(wishlist);
+
+    renderProducts(state.allProducts, false);
+}
+
 // ── API Helpers ─────────────────────────────────────────────────────
 const API = {
     async get(url) {
@@ -461,8 +492,12 @@ function renderProducts(products, append) {
         card.className = 'product-card';
         card.style.animationDelay = `${i * 50}ms`;
         card.innerHTML = `
-            <div class="product-card__image">
-                ${categoryIcon(p.category)}
+           <div class="product-card__image">
+            <button class="wishlist-btn" data-title="${p.title}">
+                ${isWishlisted(p.title) ? '❤️' : '🤍'}
+            </button>
+
+            ${categoryIcon(p.category)}
             </div>
             <div class="product-card__body">
                 ${p.category ? `<span class="product-card__category">${p.category}</span>` : ''}
@@ -485,7 +520,13 @@ function renderProducts(products, append) {
 
         // Click → get recommendations
         card.querySelector('.btn--add-cart').addEventListener('click', (e) => {
+            const wishlistBtn = card.querySelector('.wishlist-btn');
+
+            wishlistBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            toggleWishlist(p);
+            });
+    
             const title = e.target.dataset.title;
             loadRecommendations(title);
             toast(`Finding recommendations for "${title.substring(0, 40)}..."`, 'info');
