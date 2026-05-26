@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pandas as pd
 from tqdm import tqdm
 from data_adapter import adapt_data
-from nlp_engine import analyze_sentiment
+from nlp_engine import analyze_sentiment, extract_keywords
 from db import get_supabase_admin
 
 
@@ -75,7 +75,7 @@ def import_dataset(file_path, batch_size=1000, run_sentiment=False):
                 'category': str(row.get('category', ''))[:200],
                 'rating': float(row.get('rating', 0)) if pd.notna(row.get('rating')) else 0.0,
                 'avg_sentiment': float(row.get('sentiment', 0)) if pd.notna(row.get('sentiment')) else 0.0,
-                'metadata': {},
+                'tags': extract_keywords(str(row.get('description', '')) , top_n=5)
             })
 
         try:

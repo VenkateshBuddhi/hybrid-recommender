@@ -409,6 +409,7 @@ function renderProducts(products, append) {
                 ${p.category ? `<span class="product-card__category">${p.category}</span>` : ''}
                 <h3 class="product-card__title">${p.title || 'Untitled'}</h3>
                 <p class="product-card__desc">${p.description || 'No description available.'}</p>
+                ${p.tags?.length ? ` <div class="product-card__tags"> ${p.tags.map(tag => ` <button class="tag-chip" data-tag="${tag}"> #${tag} </button> `).join('')} </div> ` : ''}
                 <div class="product-card__footer">
                     <div class="product-card__rating">
                         <div class="star-rating">${renderStars(p.rating || 0)}</div>
@@ -430,6 +431,33 @@ function renderProducts(products, append) {
             const title = e.target.dataset.title;
             loadRecommendations(title);
             toast(`Finding recommendations for "${title.substring(0, 40)}..."`, 'info');
+        });
+                
+        card.querySelectorAll('.tag-chip').forEach((chip) => {
+            chip.addEventListener('click', async (e) => {
+                e.stopPropagation();
+
+                const tag = chip.dataset.tag;
+
+                try {
+                    const data = await API.get(
+                        `/api/tags?item=${encodeURIComponent(p.title)}`
+                    );
+
+                    const related = data.results || [];
+
+                    els.productsTitle.textContent = `Related to #${tag}`;
+                    els.productCount.textContent = `${related.length} related products`;
+
+                    state.products = [];
+                    els.productGrid.innerHTML = '';
+
+                    renderProducts(related, false);
+
+                } catch {
+                    toast('Failed to load related products', 'error');
+                }
+            });
         });
 
         card.addEventListener('click', () => {

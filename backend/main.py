@@ -159,7 +159,7 @@ def search_items(
             logger.warning("Full-text search failed for query '%s': %s", q.strip(), e)
             # Fallback: do a LIKE search if FTS parsing fails
             result = sb.table('products') \
-                .select('id, title, description, category, rating, avg_sentiment, review_count') \
+                .select('id, title, description, category, rating, avg_sentiment, review_count,tags') \
                 .ilike('title', f'%{q.strip()}%') \
                 .order('rating', desc=True) \
                 .limit(limit) \
@@ -169,7 +169,7 @@ def search_items(
                 p['rank'] = 0.0
     else:
         result = sb.table('products') \
-            .select('id, title, description, category, rating, avg_sentiment, review_count') \
+            .select('id, title, description, category, rating, avg_sentiment, review_count,tags') \
             .order('rating', desc=True) \
             .order('review_count', desc=True) \
             .limit(limit) \
@@ -189,6 +189,7 @@ def search_items(
             'avg_sentiment': p.get('avg_sentiment', 0.0),
             'review_count': p.get('review_count', 0),
             'rank': p.get('rank', 0.0),
+            'tags': p.get('tags', []),
         })
 
     return {
@@ -497,6 +498,48 @@ def create_purchase(data: PurchaseCreate):
         'review_text': data.review_text[:1000],
     }).execute()
     return {"purchase": result.data}
+
+@app.get("/api/tags")
+def get_related_by_tags(item: str, limit: int = 10):
+    """
+    Find related products using overlapping tags.
+    """
+
+    sb = get_supabase()
+
+    # Get current product
+    current = sb.table("products") \
+        .select("title, tags") \
+        .eq("title", item) \
+        .limit(1) \
+        .execute()
+
+    if not current.data:
+        return {
+            "results": [],
+            "message": "Item not found"
+        }
+
+    tags = current.data[0].get("tags", [])
+
+    if not tags:
+        return {
+            "results": [],
+            "message": "No tags available"
+        }
+
+    # Find products sharing tags
+    related = sb.table("products") \
+        .select("id, title, description, category, rating, tags") \
+        .overlaps("tags", tags) \
+        .neq("title", item) \
+        .limit(limit) \
+        .execute()
+
+    return {
+        "results": related.data,
+        "tags_used": tags
+    }
 
 
 # ── Frontend Serving ────────────────────────────────────────────────
